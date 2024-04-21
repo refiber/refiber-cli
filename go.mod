@@ -1,4 +1,4 @@
-module refiber
+module github.com/refiber/refiber-cli
 
 go 1.20
 

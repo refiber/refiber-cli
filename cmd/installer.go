@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"refiber/cmd/ui"
-	"refiber/cmd/ui/progress"
-	"refiber/cmd/ui/textInput"
-	"refiber/cmd/utils"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/refiber/refiber-cli/cmd/ui"
+	"github.com/refiber/refiber-cli/cmd/ui/progress"
+	"github.com/refiber/refiber-cli/cmd/ui/textInput"
+	"github.com/refiber/refiber-cli/cmd/utils"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"

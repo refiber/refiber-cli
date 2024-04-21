@@ -2,8 +2,9 @@ package textInput
 
 import (
 	"fmt"
-	"refiber/cmd/ui"
 	"regexp"
+
+	"github.com/refiber/refiber-cli/cmd/ui"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
