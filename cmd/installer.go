@@ -21,6 +21,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+/**
+ * TODO: add npm flag
+ * with npm flag we can directly install node modules and build it
+ * use this as reference https://github.com/charmbracelet/bubbletea/tree/master/examples/package-manager
+ */
+
 var installerCmd = &cobra.Command{
 	Use:   "new",
 	Short: "Initiate a new Refiber Project",
