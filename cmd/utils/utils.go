@@ -1,10 +1,15 @@
 package utils
 
 import (
+	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func MatchAllStringByRegex(regex, str string) ([]*string, error) {
@@ -93,4 +98,27 @@ func CopyFile(sourcePath, destinationPath string) error {
 	}
 
 	return nil
+}
+
+// ExecuteCmd provides a shorthand way to run a shell command
+func ExecuteCmd(name string, args []string, dir string) error {
+	command := exec.Command(name, args...)
+	command.Dir = dir
+	var out bytes.Buffer
+	command.Stdout = &out
+	if err := command.Run(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func DeferTeaPanicHandler(p *tea.Program) {
+	if r := recover(); r != nil {
+		fmt.Println("The program encountered an unexpected issue and had to exit. The error was:", r)
+		fmt.Println("If you continue to experience this issue, please post a message on our GitHub page.")
+		fmt.Println()
+		if releaseErr := p.ReleaseTerminal(); releaseErr != nil {
+			fmt.Printf("Problem releasing terminal: %v", releaseErr)
+		}
+	}
 }

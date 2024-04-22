@@ -38,7 +38,7 @@ func init() {
 	rootCmd.AddCommand(installerCmd)
 }
 
-func installer(cmt *cobra.Command, args []string) {
+func installer(cmd *cobra.Command, args []string) {
 	fmt.Println()
 
 	projectName := ""
@@ -74,21 +74,10 @@ func installer(cmt *cobra.Command, args []string) {
 	go func() {
 		defer wg.Done()
 		if err := createNewProject(&projectName, progressBar); err != nil {
-			progressBar.ReleaseTerminal()
-			fmt.Println()
 			cobra.CheckErr(ui.TextError.Render(err.Error()))
 		}
 	}()
-
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("The program encountered an unexpected issue and had to exit. The error was:", r)
-			fmt.Println("If you continue to experience this issue, please post a message on our GitHub page.")
-			if releaseErr := progressBar.ReleaseTerminal(); releaseErr != nil {
-				fmt.Printf("Problem releasing terminal: %v", releaseErr)
-			}
-		}
-	}()
+	defer utils.DeferTeaPanicHandler(progressBar)
 
 	wg.Wait()
 
