@@ -14,6 +14,9 @@ type (
 	errMsg error
 )
 
+// TODO: add required option to the model, if not required user can "ctrl+c" and "esc" to skip
+// TODO: add custom validation
+
 // A textnput.model contains the data for the textinput step.
 // It has the required methods that make it a bubbletea.Model
 type model struct {
@@ -68,8 +71,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				*m.output = m.textInput.Value()
 				return m, tea.Quit
 			}
-		case tea.KeyCtrlC, tea.KeyEsc:
-			return m, tea.Quit
+			// case tea.KeyCtrlC, tea.KeyEsc:
+			// 	return m, tea.Quit
 		}
 
 	// We handle errors just like any other message

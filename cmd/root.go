@@ -11,7 +11,7 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "refiber",
+	Use:   "refiber-cli",
 	Short: "A CLI for Refiber",
 	Long:  "A CLI for Refiber",
 }
