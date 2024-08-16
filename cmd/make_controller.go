@@ -4,17 +4,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/template"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"github.com/refiber/refiber-cli/cmd/ui"
 	"github.com/refiber/refiber-cli/cmd/ui/selectInput"
 	"github.com/refiber/refiber-cli/cmd/ui/textInput"
 	"github.com/refiber/refiber-cli/cmd/utils"
-	"github.com/spf13/cobra"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 var makeControllerCmd = &cobra.Command{
@@ -33,12 +35,27 @@ func generateController(cmd *cobra.Command, args []string) {
 
 	var input string
 	if len(args) < 1 {
-		p := tea.NewProgram(textInput.InitialTextInputModel(&input, "Please provide a controller name"))
+		p := tea.NewProgram(textInput.InitialTextInputModel(&input, &textInput.Config{
+			Header: ui.TextTitle.Render("Please provide a controller name"),
+			Validation: func(s string) error {
+				matched, _ := regexp.Match("^[a-zA-Z0-9_-]+$", []byte(s))
+				if !matched {
+					return fmt.Errorf("Invalid controller name")
+				}
+				return nil
+			},
+		}))
 		if _, err := p.Run(); err != nil {
 			cobra.CheckErr(ui.TextError.Render(err.Error()))
 		}
 	} else {
 		input = args[0]
+	}
+
+	if input == "" {
+		fmt.Println(ui.TextWarning.Render("Controller creation has been canceled"))
+		fmt.Println()
+		return
 	}
 
 	currentWorkingDir, err := os.Getwd()
@@ -128,7 +145,7 @@ func generateController(cmd *cobra.Command, args []string) {
 		MethodName:     strings.ReplaceAll(*cName, "Controller", ""),
 		ControllerName: *cName,
 		ModelName:      modelName,
-		ReciverName:    "c",
+		ReciverName:    "ctr",
 	}
 
 	// inject data to the template

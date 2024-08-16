@@ -8,24 +8,25 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/spf13/cobra"
 
 	"github.com/refiber/refiber-cli/cmd/ui"
 	"github.com/refiber/refiber-cli/cmd/ui/progress"
 	"github.com/refiber/refiber-cli/cmd/ui/textInput"
 	"github.com/refiber/refiber-cli/cmd/utils"
-
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/spf13/cobra"
 )
 
-/**
- * TODO: add npm flag
- * with npm flag we can directly install node modules and build it
- * use this as reference https://github.com/charmbracelet/bubbletea/tree/master/examples/package-manager
- */
+// TODO: add npm flag
+// with npm flag we can directly install node modules and build it
+// use this as reference https://github.com/charmbracelet/bubbletea/tree/master/examples/package-manager
+
+// TODO: add module flag
 
 var installerCmd = &cobra.Command{
 	Use:   "new",
@@ -34,6 +35,8 @@ var installerCmd = &cobra.Command{
 	Run:   installer,
 }
 
+var warnings []*string
+
 func init() {
 	rootCmd.AddCommand(installerCmd)
 }
@@ -41,10 +44,20 @@ func init() {
 func installer(cmd *cobra.Command, args []string) {
 	fmt.Println()
 
-	projectName := ""
+	var projectName string
 
 	if len(args) < 1 {
-		p := tea.NewProgram(textInput.InitialTextInputModel(&projectName, "Please provide a project name"))
+		p := tea.NewProgram(textInput.InitialTextInputModel(&projectName, &textInput.Config{
+			Header:      ui.TextTitle.Render("Please provide a project name"),
+			Placeholder: "my-app",
+			Validation: func(s string) error {
+				matched, _ := regexp.Match("^[a-zA-Z0-9_-]+$", []byte(s))
+				if !matched {
+					return fmt.Errorf("Invalid project name")
+				}
+				return nil
+			},
+		}))
 		if _, err := p.Run(); err != nil {
 			cobra.CheckErr(ui.TextError.Render(err.Error()))
 			return
@@ -53,11 +66,40 @@ func installer(cmd *cobra.Command, args []string) {
 		projectName = args[0]
 	}
 
+	if projectName == "" {
+		fmt.Println(ui.TextWarning.Render("Project creation has been canceled"))
+		fmt.Println()
+		return
+	}
+
 	if projectName != "" && utils.DoesDirectoryExistAndIsNotEmpty(projectName) {
 		cobra.CheckErr(ui.TextError.Render(fmt.Sprintf(`directory %s already exists and is not empty. Please choose a different name`, projectName)))
 		return
 	}
 	projectName = strings.TrimSpace(projectName)
+
+	var moduleName string
+	p := tea.NewProgram(textInput.InitialTextInputModel(&moduleName, &textInput.Config{
+		Header:      ui.TextTitle.Render("Please provide a module name"),
+		Placeholder: "bykevin.work/refiber",
+		Validation: func(s string) error {
+			matched, _ := regexp.Match(`^([a-zA-Z0-9_\-\.]+\/)*[a-zA-Z0-9_\-\.]+$`, []byte(s))
+			if !matched {
+				return fmt.Errorf("Invalid module name")
+			}
+			return nil
+		},
+	}))
+	if _, err := p.Run(); err != nil {
+		cobra.CheckErr(ui.TextError.Render(err.Error()))
+	}
+
+	if moduleName == "" {
+		fmt.Println(ui.TextWarning.Render("No module name provided. Using the default module name"))
+		fmt.Println()
+	}
+
+	moduleName = strings.TrimSpace(moduleName)
 
 	progressBar := tea.NewProgram(progress.InitialProgressModel("Preparing..."))
 	wg := sync.WaitGroup{}
@@ -73,7 +115,7 @@ func installer(cmd *cobra.Command, args []string) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := createNewProject(&projectName, progressBar); err != nil {
+		if err := createNewProject(&projectName, &moduleName, progressBar); err != nil {
 			cobra.CheckErr(ui.TextError.Render(err.Error()))
 		}
 	}()
@@ -90,9 +132,16 @@ func installer(cmd *cobra.Command, args []string) {
 	fmt.Println("  " + ui.TextGreen.Render("npm") + " " + ui.TextGray.Render("i && ") + ui.TextGreen.Render("npm") + " " + ui.TextGray.Render("run build"))
 	fmt.Println()
 	fmt.Println("  " + ui.TextGreen.Render("air"))
+
+	if len(warnings) > 0 {
+		fmt.Println()
+		for _, wr := range warnings {
+			fmt.Println("  " + ui.TextWarning.Render(*wr))
+		}
+	}
 }
 
-func createNewProject(projectName *string, progressBar *tea.Program) error {
+func createNewProject(projectName, moduleName *string, progressBar *tea.Program) error {
 	progressBar.Send(progress.ProgressMsg{Value: 0.0})
 
 	currentWorkingDir, err := os.Getwd()
@@ -159,12 +208,19 @@ func createNewProject(projectName *string, progressBar *tea.Program) error {
 	if err = utils.DownloadFile(refiberDownloadArchiveURL, tempFilePath); err != nil {
 		return err
 	}
-	progressBar.Send(progress.ProgressMsg{Value: 0.90})
+	progressBar.Send(progress.ProgressMsg{Value: 0.80})
 	if err = extractTarGz(tempFilePath, projectPath, "refiber-"+*latestRelease); err != nil {
 		return err
 	}
 	if err = os.Remove(tempFilePath); err != nil {
 		return err
+	}
+
+	progressBar.Send(progress.ProgressMsg{Value: 0.90})
+	if *moduleName != "" {
+		if err = utils.UpdateModuleNameAndImports(&projectPath, moduleName, &warnings); err != nil {
+			return err
+		}
 	}
 
 	// copy .env.example to .env

@@ -2,12 +2,11 @@ package textInput
 
 import (
 	"fmt"
-	"regexp"
-
-	"github.com/refiber/refiber-cli/cmd/ui"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/refiber/refiber-cli/cmd/ui"
 )
 
 type (
@@ -20,59 +19,100 @@ type (
 // A textnput.model contains the data for the textinput step.
 // It has the required methods that make it a bubbletea.Model
 type model struct {
-	textInput textinput.Model
-	err       error
-	output    *string
-	header    string
+	textInput    textinput.Model
+	err          error
+	output       *string
+	header       *string
+	disabledExit bool
+	validation   textinput.ValidateFunc
 }
 
-// sanitizeInput verifies that an input text string gets validated
-func sanitizeInput(input string) error {
-	matched, err := regexp.Match("^[a-zA-Z0-9_-]+$", []byte(input))
-	if !matched {
-		return fmt.Errorf("string violates the input regex pattern, err: %v", err)
-	}
-	return nil
+type Config struct {
+	Header       string
+	Placeholder  string
+	Validation   textinput.ValidateFunc
+	MaxChar      int
+	Width        int
+	DisabledExit bool
 }
 
 // InitialTextInputModel initializes a textinput step
 // with the given data
-func InitialTextInputModel(output *string, header string) model {
+func InitialTextInputModel(output *string, config *Config) model {
 	ti := textinput.New()
 	ti.Focus()
-	ti.CharLimit = 156
+	ti.CharLimit = 300
 	ti.Width = 20
-	ti.Validate = sanitizeInput
 
-	return model{
-		textInput: ti,
+	m := model{
 		err:       nil,
 		output:    output,
-		header:    ui.TextTitle.Render(header),
+		textInput: ti,
 	}
+
+	if config != nil {
+		if config.Placeholder != "" {
+			ti.Placeholder = config.Placeholder
+		}
+
+		if config.Header != "" {
+			m.header = &config.Header
+		}
+
+		if config.Validation != nil {
+			m.validation = config.Validation
+		}
+
+		if config.MaxChar > 0 {
+			ti.CharLimit = config.MaxChar
+		}
+
+		if config.Width > 0 {
+			ti.Width = config.Width
+		}
+
+		if config.DisabledExit {
+			m.disabledExit = true
+		}
+	}
+
+	return m
 }
 
-// Init is called at the beginning of a textinput step
-// and sets the cursor to blink
 func (m model) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-// Update is called when "things happen", it checks for the users text input,
-// and for Ctrl+C or Esc to close the program.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+
+	if m.validation != nil && m.textInput.Value() != "" {
+		err := m.validation(m.textInput.Value())
+		if err != nil {
+			m.err = err
+		} else {
+			m.err = nil
+		}
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyEnter:
-			if len(m.textInput.Value()) > 1 {
-				*m.output = m.textInput.Value()
-				return m, tea.Quit
+			if m.textInput.Value() == "" || m.err != nil {
+				break
 			}
-			// case tea.KeyCtrlC, tea.KeyEsc:
-			// 	return m, tea.Quit
+
+			*m.output = m.textInput.Value()
+			m.textInput.Blur()
+			return m, tea.Quit
+		case tea.KeyCtrlC:
+			if m.disabledExit {
+				return m, cmd
+			}
+
+			m.textInput.Blur()
+			return m, tea.Quit
 		}
 
 	// We handle errors just like any other message
@@ -87,8 +127,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View is called to draw the textinput step
 func (m model) View() string {
+	if m.header == nil {
+		if m.err != nil {
+			return fmt.Sprintf("%s\n\n%s\n\n", m.textInput.View(), ui.TextError.PaddingLeft(2).Render(m.err.Error()))
+		}
+
+		return fmt.Sprintf("%s\n\n", m.textInput.View())
+	}
+
+	if m.err != nil {
+		return fmt.Sprintf("%s\n\n%s\n\n%s\n\n",
+			*m.header,
+			m.textInput.View(),
+			ui.TextError.PaddingLeft(2).Render(m.err.Error()),
+		)
+	}
+
 	return fmt.Sprintf("%s\n\n%s\n\n",
-		m.header,
+		*m.header,
 		m.textInput.View(),
 	)
 }
