@@ -141,7 +141,7 @@ func generateController(cmd *cobra.Command, args []string) {
 	modelName := utils.GetLowercaseFirstChar(*cName)
 
 	data := &ControllerData{
-		PackageName:    packageName,
+		PackageName:    createPackageName(packageName),
 		MethodName:     strings.ReplaceAll(*cName, "Controller", ""),
 		ControllerName: *cName,
 		ModelName:      modelName,
@@ -169,6 +169,15 @@ func getControllersDirPath(currentWorkingDir *string) *string {
 
 	p := filepath.Join(*currentWorkingDir, "app", "controllers")
 	return &p
+}
+
+func createPackageName(pkgName string) string {
+	pkgName = strings.ToLower(pkgName)
+
+	pkgName = strings.ReplaceAll(pkgName, "_", "")
+	pkgName = strings.ReplaceAll(pkgName, "-", "")
+
+	return pkgName
 }
 
 func getControllerNameAndPath(input string, currentWorkingDir *string) (name, path *string, err error) {
